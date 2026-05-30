@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalkulator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a1a;
+    color: #f0f0f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 16px;
+  }
+  .calculator {
+    background: #2a2a2a;
+    border-radius: 16px;
+    padding: 20px;
+    max-width: 360px;
+    width: 100%;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .display {
+    background: #1a1a1a;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    text-align: right;
+    font-size: 2rem;
+    font-weight: 300;
+    min-height: 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-end;
+    overflow: hidden;
+  }
+  .display .expression {
+    font-size: 0.85rem;
+    color: #888;
+    min-height: 1.2em;
+    word-break: break-all;
+  }
+  .display .result {
+    font-size: 2rem;
+    line-height: 1.2;
+    word-break: break-all;
+  }
+  .buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  button {
+    font-size: 1.3rem;
+    padding: 16px 0;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: filter 0.1s, transform 0.1s;
+    font-family: inherit;
+    font-weight: 500;
+  }
+  button:active { filter: brightness(1.3); transform: scale(0.95); }
+  .btn-num { background: #3a3a3a; color: #f0f0f0; }
+  .btn-op { background: #ff9500; color: #fff; }
+  .btn-fn { background: #505050; color: #f0f0f0; }
+  .btn-eq { background: #ff9500; color: #fff; }
+  .btn-clear { background: #d32f2f; color: #fff; }
+  .span-2 { grid-column: span 2; }
+  @media (max-width: 400px) {
+    .calculator { padding: 12px; }
+    .display { padding: 12px 16px; font-size: 1.6rem; }
+    button { font-size: 1.1rem; padding: 14px 0; }
+    .buttons { gap: 8px; }
+  }
+  @media (min-width: 401px) and (max-width: 768px) {
+    .calculator { max-width: 320px; }
+  }
+</style>
+</head>
+<body>
+<div class="calculator" role="application" aria-label="Kalkulator">
+  <div class="display" id="display">
+    <div class="expression" id="expression"></div>
+    <div class="result" id="result">0</div>
+  </div>
+  <div class="buttons">
+    <button class="btn-clear" data-action="clear" aria-label="Clear">C</button>
+    <button class="btn-fn" data-action="backspace" aria-label="Backspace">&larr;</button>
+    <button class="btn-op" data-action="operator" data-value="÷" aria-label="Division">÷</button>
+    <button class="btn-op" data-action="operator" data-value="×" aria-label="Multiplication">×</button>
+    <button class="btn-num" data-action="digit" data-value="7">7</button>
+    <button class="btn-num" data-action="digit" data-value="8">8</button>
+    <button class="btn-num" data-action="digit" data-value="9">9</button>
+    <button class="btn-op" data-action="operator" data-value="-" aria-label="Subtraction">-</button>
+    <button class="btn-num" data-action="digit" data-value="4">4</button>
+    <button class="btn-num" data-action="digit" data-value="5">5</button>
+    <button class="btn-num" data-action="digit" data-value="6">6</button>
+    <button class="btn-op" data-action="operator" data-value="+" aria-label="Addition">+</button>
+    <button class="btn-num" data-action="digit" data-value="1">1</button>
+    <button class="btn-num" data-action="digit" data-value="2">2</button>
+    <button class="btn-num" data-action="digit" data-value="3">3</button>
+    <button class="btn-eq" data-action="equals" aria-label="Equals">=</button>
+    <button class="btn-num span-2" data-action="digit" data-value="0">0</button>
+    <button class="btn-num" data-action="decimal" aria-label="Decimal point">.</button>
+    <div></div>
+  </div>
+</div>
+<script>
+  (function() {
+    'use strict';
+
+    const display = document.getElementById('result');
+    const expression = document.getElementById('expression');
+
+    // Calculator state
+    let currentInput = '0';
+    let previousValue = null;
+    let currentOperator = null;
+    let shouldResetInput = false;
+    let hasCalculated = false;
+
+    function updateDisplay() {
+      display.textContent = currentInput;
+    }
+
+    function updateExpression(op) {
+      expression.textContent = (previousValue !== null ? previousValue : '') + ' ' + op + ' ';
+    }
+
+    function clearExpression() {
+      expression.textContent = '';
+    }
+
+    function inputDigit(digit) {
+      if (shouldResetInput) {
+        currentInput = digit;
+        shouldResetInput = false;
+        hasCalculated = false;
+      } else {
+        if (currentInput === '0' && digit !== '.') {
+          currentInput = digit;
+        } else {
+          // Prevent overly long numbers
+          if (currentInput.replace('-', '').replace('.', '').length >= 15) return;
+          currentInput += digit;
+        }
+      }
+      updateDisplay();
+    }
+
+    function inputDecimal() {
+      if (shouldResetInput) {
+        currentInput = '0.';
+        shouldResetInput = false;
+        hasCalculated = false;
+        updateDisplay();
+        return;
+      }
+      if (currentInput.includes('.')) return;
+      if (currentInput === '') currentInput = '0';
+      currentInput += '.';
+      updateDisplay();
+    }
+
+    function handleOperator(op) {
+      const current = parseFloat(currentInput);
+      if (isNaN(current)) return;
+
+      if (previousValue !== null && currentOperator && !shouldResetInput) {
+        const result = calculate(previousValue, current, currentOperator);
+        currentInput = String(result);
+        previousValue = result;
+        updateDisplay();
+      } else {
+        previousValue = current;
+      }
+
+      currentOperator = op;
+      shouldResetInput = true;
+      hasCalculated = false;
+      updateExpression(formatOperator(op));
+    }
+
+    function formatOperator(op) {
+      const map = { '+': '+', '-': '-', '×': '×', '÷': '÷' };
+      return map[op] || op;
+    }
+
+    function calculate(a, b, op) {
+      switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '×': return a * b;
+        case '÷': return b !== 0 ? a / b : 'Error';
+        default: return b;
+      }
+    }
+
+    function handleEquals() {
+      if (previousValue === null || currentOperator === null) return;
+
+      const current = parseFloat(currentInput);
+      if (isNaN(current)) return;
+
+      if (hasCalculated) {
+        // Repeat last operation with the result and the previous second operand
+        const result = calculate(previousValue, current, currentOperator);
+        if (result === 'Error') {
+          currentInput = 'Error';
+          updateDisplay();
+          return;
+        }
+        currentInput = String(result);
+        updateDisplay();
+        return;
+      }
+
+      const result = calculate(previousValue, current, currentOperator);
+      if (result === 'Error') {
+        currentInput = 'Error';
+        updateDisplay();
+        hasCalculated = true;
+        return;
+      }
+
+      const expr = formatExpression(previousValue, currentOperator, current);
+      expression.textContent = expr + ' =';
+      currentInput = String(result);
+      previousValue = result;
+      shouldResetInput = true;
+      hasCalculated = true;
+      updateDisplay();
+    }
+
+    function formatExpression(a, op, b) {
+      return a + ' ' + formatOperator(op) + ' ' + b;
+    }
+
+    function handleClear() {
+      currentInput = '0';
+      previousValue = null;
+      currentOperator = null;
+      shouldResetInput = false;
+      hasCalculated = false;
+      clearExpression();
+      updateDisplay();
+    }
+
+    function handleBackspace() {
+      if (shouldResetInput || hasCalculated) return;
+      if (currentInput.length <= 1 || (currentInput.length === 2 && currentInput.startsWith('-'))) {
+        currentInput = '0';
+      } else {
+        currentInput = currentInput.slice(0, -1);
+      }
+      updateDisplay();
+    }
+
+    // Button click handler
+    document.querySelector('.calculator').addEventListener('click', function(e) {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      const value = btn.dataset.value;
+
+      switch (action) {
+        case 'digit': inputDigit(value); break;
+        case 'decimal': inputDecimal(); break;
+        case 'operator': handleOperator(value); break;
+        case 'equals': handleEquals(); break;
+        case 'clear': handleClear(); break;
+        case 'backspace': handleBackspace(); break;
+      }
+    });
+
+    // Keyboard support
+    document.addEventListener('keydown', function(e) {
+      const key = e.key;
+
+      if (key >= '0' && key <= '9') {
+        e.preventDefault();
+        inputDigit(key);
+        return;
+      }
+
+      if (key === '.') {
+        e.preventDefault();
+        inputDecimal();
+        return;
+      }
+
+      if (key === '+') { e.preventDefault(); handleOperator('+'); return; }
+      if (key === '-') { e.preventDefault(); handleOperator('-'); return; }
+      if (key === '*') { e.preventDefault(); handleOperator('×'); return; }
+      if (key === '/') { e.preventDefault(); handleOperator('÷'); return; }
+
+      if (key === 'Enter' || key === '=') {
+        e.preventDefault();
+        handleEquals();
+        return;
+      }
+
+      if (key === 'Escape') {
+        e.preventDefault();
+        handleClear();
+        return;
+      }
+
+      if (key === 'Backspace') {
+        e.preventDefault();
+        handleBackspace();
+        return;
+      }
+    });
+  })();
+</script>
+</body>
+</html>
